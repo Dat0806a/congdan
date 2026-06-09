@@ -28,8 +28,8 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// API endpoint for Chat
-app.use("/video", express.static(path.join(process.cwd(), "video")));
+// API endpoint for Chat fallback (statically served asset)
+app.use("/video", express.static(path.join(process.cwd(), "public/video")));
 
 app.post("/api/chat", async (req, res) => {
   try {
