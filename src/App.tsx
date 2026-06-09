@@ -264,7 +264,7 @@ export default function App() {
           throw new Error("API Key cấu hình không hợp lệ.");
         }
         
-        // Support trying models (gemini-1.5-flash, gemini-2.5-flash, gemini-2.0-flash)
+        // Support trying models (gemini-1.5-flash, gemini-2.0-flash)
         const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
         let success = false;
         
@@ -286,40 +286,56 @@ export default function App() {
           parts: [{ text: citizenQuestion }]
         });
 
-        for (const model of models) {
-          try {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const clientRes = await fetch(endpoint, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                contents,
-                systemInstruction: {
-                  parts: [{ text: systemInstruction }]
-                },
-                generationConfig: {
-                  temperature: 0.7
-                }
-              })
-            });
+        // Simple delay function for retry
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-            if (clientRes.ok) {
-              const data = await clientRes.json();
-              if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-                answer = data.candidates[0].content.parts[0].text;
-                success = true;
-                break;
+        for (const model of models) {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+              const clientRes = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  contents,
+                  systemInstruction: {
+                    parts: [{ text: systemInstruction }]
+                  },
+                  generationConfig: {
+                    temperature: 0.7
+                  }
+                })
+              });
+
+              if (clientRes.status === 429) {
+                console.warn(`Attempt ${attempt + 1}: Rate limited (429), retrying in ${Math.pow(2, attempt) * 1000}ms...`);
+                await delay(Math.pow(2, attempt) * 1000);
+                continue;
               }
+
+              if (clientRes.ok) {
+                const data = await clientRes.json();
+                if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+                  answer = data.candidates[0].content.parts[0].text;
+                  success = true;
+                  break;
+                }
+              } else {
+                 console.error(`Direct call with model ${model} failed with status: ${clientRes.status}`);
+                 break; // Don't retry non-429 errors
+              }
+            } catch (modelErr) {
+              console.error(`Direct call with model ${model} failed:`, modelErr);
+              break;
             }
-          } catch (modelErr) {
-            console.error(`Direct call with model ${model} failed:`, modelErr);
           }
+          if (success) break;
         }
 
         if (!success) {
-          throw new Error("Không thể kết nối trực tiếp đến API của Gemini bằng mã khóa.");
+          throw new Error("Không thể kết nối đến API của Gemini (quá tải hoặc cấu hình sai).");
         }
       }
 
