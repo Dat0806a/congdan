@@ -1,0 +1,6 @@
+{
+  "name": "Interactive Citizen Assistant",
+  "description": "Cổng thông tin hỗ trợ công dân với trợ lý ảo AI tương tác qua video, tự động lặp cử chỉ sinh động khi chờ và nói chuyện khi trả lời.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
