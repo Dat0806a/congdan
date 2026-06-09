@@ -69,36 +69,6 @@ export default function App() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // API Key Settings States (No keys are hardcoded. Kept safe in localStorage or Environment settings)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [customApiKey, setCustomApiKey] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("USER_GEMINI_API_KEY") || "";
-    }
-    return "";
-  });
-  const [tempApiKey, setTempApiKey] = useState(customApiKey);
-
-  // Sync temp key when opening settings modal
-  useEffect(() => {
-    if (isSettingsOpen) {
-      setTempApiKey(customApiKey);
-    }
-  }, [isSettingsOpen, customApiKey]);
-
-  const handleSaveApiKey = (key: string) => {
-    const trimmed = key.trim();
-    if (typeof window !== "undefined") {
-      if (trimmed) {
-        localStorage.setItem("USER_GEMINI_API_KEY", trimmed);
-      } else {
-        localStorage.removeItem("USER_GEMINI_API_KEY");
-      }
-    }
-    setCustomApiKey(trimmed);
-    setIsSettingsOpen(false);
-  };
-
   // Video Source States
   const [videoSource, setVideoSource] = useState(SAMPLES[0].url);
   const [videoSourceName, setVideoSourceName] = useState(SAMPLES[0].name);
@@ -288,18 +258,13 @@ export default function App() {
       } catch (backendErr) {
         console.warn("Express backend /api/chat is not responding or 404 (expected on static Netlify host). Resorting to direct client-side Gemini call...", backendErr);
         
-        // Secure client-side credentials check (No hardcoded keys stored in bundles)
-        // First checks user-saved local browser state, then optional Vite build configurations
-        const apiKey = (customApiKey || (((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || "")).trim();
-        
+        // Client-side fallback using the VITE_GEMINI_API environment variable
+        const apiKey = (import.meta as any).env?.VITE_GEMINI_API;
         if (!apiKey) {
-          throw new Error(
-            "Cổng kết nối máy chủ ngoại tuyến (ví dụ: máy chủ Netlify tĩnh) và chưa cấu hình mã API Key cho trình duyệt. " +
-            "Quý công dân vui lòng nhấn vào biểu tượng Bánh Răng cài đặt ở thanh tiêu đề khung chat để cấu hình API Key bảo mật."
-          );
+          throw new Error("API Key cấu hình không hợp lệ.");
         }
         
-        // Support trying models (gemini-1.5-flash, gemini-2.0-flash)
+        // Support trying models (gemini-1.5-flash, gemini-2.5-flash, gemini-2.0-flash)
         const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
         let success = false;
         
@@ -792,20 +757,11 @@ export default function App() {
               </div>
             </div>
             
-            {/* Quick stats on interaction & settings config button */}
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:block text-right">
-                <span className="text-[10px] bg-black/60 border border-neutral-800 px-2 py-0.5 rounded font-mono text-neutral-400 uppercase tracking-widest">
-                  Thread: {messages.length} msg
-                </span>
-              </div>
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-1.5 rounded-lg bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 hover:bg-neutral-900 text-neutral-400 hover:text-cyan-400 transition-all cursor-pointer flex items-center justify-center"
-                title="Cấu hình API Key bảo mật"
-              >
-                <Settings className="w-4 h-4 animate-hover" />
-              </button>
+            {/* Quick stats on interaction */}
+            <div className="hidden sm:block text-right">
+              <span className="text-[10px] bg-black/60 border border-neutral-800 px-2 py-0.5 rounded font-mono text-neutral-400 uppercase tracking-widest">
+                Thread: {messages.length} msg
+              </span>
             </div>
           </div>
 
@@ -1010,114 +966,6 @@ export default function App() {
           </div>
         </div>
       </footer>
-
-      {/* Dynamic Security Settings Modal */}
-      <AnimatePresence>
-        {isSettingsOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              transition={{ type: "spring", duration: 0.35 }}
-              className="w-full max-w-lg bg-[#0e0e0e] border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden text-left"
-            >
-              {/* Modal Header */}
-              <div className="p-5 border-b border-neutral-850 bg-[#121212] flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-950/30 border border-cyan-800/50 flex items-center justify-center text-cyan-400">
-                    <Settings className="w-4 h-4 animate-spin-slow" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xs uppercase tracking-wider text-neutral-100">Cấu hình API Key Bảo mật</h3>
-                    <p className="text-[10px] text-neutral-500 mt-0.5">Quản lý khóa kết nối trực tiếp đến Gemini AI</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="p-1 rounded-md hover:bg-neutral-900 border border-transparent hover:border-neutral-800 text-neutral-500 hover:text-neutral-300 transition-all cursor-pointer text-lg font-light leading-none"
-                >
-                  ×
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-4">
-                <div className="bg-yellow-500/5 border border-yellow-500/20 p-3.5 rounded-xl flex gap-3 text-xs text-yellow-200/90 leading-relaxed">
-                  <ShieldAlert className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold text-yellow-400 block mb-1">Nguyên lý bảo mật tuyệt đối:</span>
-                    <span className="text-neutral-400 text-[11px] block leading-relaxed mb-2">
-                      Khi chạy nội bộ hoặc máy chủ hoàn thiện, hệ thống sử dụng proxy Node.js để giấu kín API Key. Tuy nhiên, nếu bạn tải mã nguồn lên các nền tảng máy chủ tĩnh (như Netlify), máy chủ Express sẽ không chạy. Nhập API Key ở đây sẽ kích hoạt chế độ kết nối trực tiếp từ trình duyệt của bạn đến Google Gemini.
-                    </span>
-                    <span className="font-semibold text-cyan-400 block text-[11px]">
-                      Mã API Key bạn nhập sẽ được lưu duy nhất cục bộ trong bản ghi trình duyệt riêng tư của bạn (localStorage). KHÔNG lưu trên máy chủ chung, tuyệt đối không bị dòm ngó hoặc lạm dụng.
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
-                    Nhập mã khóa Gemini API của bạn:
-                  </label>
-                  <input
-                    type="password"
-                    value={tempApiKey}
-                    onChange={(e) => setTempApiKey(e.target.value)}
-                    placeholder="Dán mã khóa (bắt đầu bằng AIzaSy...) vào đây..."
-                    className="w-full bg-black border border-neutral-800 rounded-xl py-3 px-4 text-xs font-mono text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-                  />
-                  <span className="text-[10px] text-neutral-500 block leading-tight">
-                    * Mẹo: Để trống để dùng qua proxy của máy chủ hiện tại (mặc định nếu có).
-                  </span>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="bg-[#121212] px-6 py-4 border-t border-neutral-850 flex items-center justify-between">
-                <div>
-                  {customApiKey ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleSaveApiKey("");
-                        setTempApiKey("");
-                      }}
-                      className="text-[11px] text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1 cursor-pointer hover:underline"
-                    >
-                      Xóa khóa đã lưu
-                    </button>
-                  ) : (
-                    <span className="text-[10px] text-neutral-600 font-mono">Chưa lưu khóa riêng</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="px-4 py-2 text-xs rounded-xl border border-neutral-800 hover:bg-neutral-900 text-neutral-400 hover:text-white transition-all cursor-pointer"
-                  >
-                    Bỏ qua
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveApiKey(tempApiKey)}
-                    className="px-4 py-2 text-xs rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-all hover:shadow-lg hover:shadow-cyan-900/30 cursor-pointer"
-                  >
-                    Lưu cấu hình
-                  </button>
-                </div>
-              </div>
-
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 
